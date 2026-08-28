@@ -4,9 +4,11 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/ubikyo/kbrd-agent/internal/application"
+	"github.com/ubikyo/kbrd-agent/internal/browser"
 )
 
 type fakeApplications struct {
@@ -30,10 +32,25 @@ func (service *fakeApplications) Quit(_ context.Context, id string) error {
 	return nil
 }
 
+type fakeBrowsers struct {
+	lastID  string
+	lastURL string
+}
+
+func (service *fakeBrowsers) List(context.Context) ([]browser.Browser, error) {
+	return []browser.Browser{{ID: "com.example.Browser", Name: "Example Browser"}}, nil
+}
+
+func (service *fakeBrowsers) Open(_ context.Context, id string, url string) error {
+	service.lastID = id
+	service.lastURL = url
+	return nil
+}
+
 func TestApplicationsRequireAuthentication(t *testing.T) {
 	request := httptest.NewRequest(http.MethodGet, "/v1/applications", nil)
 	response := httptest.NewRecorder()
-	New(&fakeApplications{}, "secret").ServeHTTP(response, request)
+	New(&fakeApplications{}, &fakeBrowsers{}, "secret").ServeHTTP(response, request)
 	if response.Code != http.StatusUnauthorized {
 		t.Fatalf("expected %d, got %d", http.StatusUnauthorized, response.Code)
 	}
@@ -41,7 +58,7 @@ func TestApplicationsRequireAuthentication(t *testing.T) {
 
 func TestListsAndLaunchesApplications(t *testing.T) {
 	applications := &fakeApplications{}
-	handler := New(applications, "secret")
+	handler := New(applications, &fakeBrowsers{}, "secret")
 	list := httptest.NewRequest(http.MethodGet, "/v1/applications", nil)
 	list.Header.Set("Authorization", "Bearer secret")
 	listResponse := httptest.NewRecorder()
@@ -63,5 +80,49 @@ func TestListsAndLaunchesApplications(t *testing.T) {
 	}
 	if applications.lastAction != "launch" || applications.lastID != "com.example.App" {
 		t.Fatalf("unexpected action: %s %s", applications.lastAction, applications.lastID)
+	}
+}
+
+func TestListsAndOpensBrowsers(t *testing.T) {
+	browsers := &fakeBrowsers{}
+	handler := New(&fakeApplications{}, browsers, "secret")
+
+	list := httptest.NewRequest(http.MethodGet, "/v1/browsers", nil)
+	list.Header.Set("Authorization", "Bearer secret")
+	listResponse := httptest.NewRecorder()
+	handler.ServeHTTP(listResponse, list)
+	if listResponse.Code != http.StatusOK {
+		t.Fatalf("expected %d, got %d", http.StatusOK, listResponse.Code)
+	}
+
+	open := httptest.NewRequest(
+		http.MethodPost,
+		"/v1/browsers/com.example.Browser/open",
+		strings.NewReader(`{"url":"https://example.com"}`),
+	)
+	open.Header.Set("Authorization", "Bearer secret")
+	openResponse := httptest.NewRecorder()
+	handler.ServeHTTP(openResponse, open)
+	if openResponse.Code != http.StatusOK {
+		t.Fatalf("expected %d, got %d", http.StatusOK, openResponse.Code)
+	}
+	if browsers.lastID != "com.example.Browser" || browsers.lastURL != "https://example.com" {
+		t.Fatalf("unexpected open: %s %s", browsers.lastID, browsers.lastURL)
+	}
+}
+
+func TestOpenBrowserRejectsMissingURL(t *testing.T) {
+	handler := New(&fakeApplications{}, &fakeBrowsers{}, "secret")
+
+	open := httptest.NewRequest(
+		http.MethodPost,
+		"/v1/browsers/com.example.Browser/open",
+		strings.NewReader(`{}`),
+	)
+	open.Header.Set("Authorization", "Bearer secret")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, open)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("expected %d, got %d", http.StatusBadRequest, response.Code)
 	}
 }

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ubikyo/kbrd-agent/internal/application"
+	"github.com/ubikyo/kbrd-agent/internal/browser"
 	"github.com/ubikyo/kbrd-agent/internal/registration"
 	"github.com/ubikyo/kbrd-agent/internal/server"
 )
@@ -40,7 +41,7 @@ func main() {
 
 	httpServer := &http.Server{
 		Addr:              registration.Address(*host, *port),
-		Handler:           server.New(application.NewService(), token),
+		Handler:           server.New(application.NewService(), browser.NewService(), token),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       30 * time.Second,
 	}

@@ -12,19 +12,23 @@ import (
 	"time"
 
 	"github.com/ubikyo/kbrd-agent/internal/application"
+	"github.com/ubikyo/kbrd-agent/internal/browser"
 )
 
 type Server struct {
 	applications application.Service
+	browsers     browser.Service
 	token        string
 }
 
-func New(applications application.Service, token string) http.Handler {
-	server := &Server{applications: applications, token: token}
+func New(applications application.Service, browsers browser.Service, token string) http.Handler {
+	server := &Server{applications: applications, browsers: browsers, token: token}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/health", server.health)
 	mux.HandleFunc("GET /v1/applications", server.auth(server.list))
 	mux.HandleFunc("POST /v1/applications/", server.auth(server.action))
+	mux.HandleFunc("GET /v1/browsers", server.auth(server.browserList))
+	mux.HandleFunc("POST /v1/browsers/", server.auth(server.browserOpen))
 	return requestLog(mux)
 }
 
@@ -84,6 +88,51 @@ func (server *Server) action(response http.ResponseWriter, request *http.Request
 		return
 	}
 	if err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, context.DeadlineExceeded) {
+			status = http.StatusGatewayTimeout
+		}
+		writeError(response, status, err.Error())
+		return
+	}
+	writeJSON(response, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (server *Server) browserList(response http.ResponseWriter, request *http.Request) {
+	ctx, cancel := context.WithTimeout(request.Context(), 15*time.Second)
+	defer cancel()
+	browsers, err := server.browsers.List(ctx)
+	if err != nil {
+		writeError(response, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(response, http.StatusOK, browsers)
+}
+
+func (server *Server) browserOpen(response http.ResponseWriter, request *http.Request) {
+	remainder := strings.TrimPrefix(request.URL.Path, "/v1/browsers/")
+	separator := strings.LastIndexByte(remainder, '/')
+	if separator < 1 || remainder[separator+1:] != "open" {
+		writeError(response, http.StatusNotFound, "not found")
+		return
+	}
+	id, err := url.PathUnescape(remainder[:separator])
+	if err != nil || id == "" {
+		writeError(response, http.StatusBadRequest, "invalid browser id")
+		return
+	}
+
+	var payload struct {
+		URL string `json:"url"`
+	}
+	if err := json.NewDecoder(request.Body).Decode(&payload); err != nil || payload.URL == "" {
+		writeError(response, http.StatusBadRequest, "missing url")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(request.Context(), 15*time.Second)
+	defer cancel()
+	if err := server.browsers.Open(ctx, id, payload.URL); err != nil {
 		status := http.StatusInternalServerError
 		if errors.Is(err, context.DeadlineExceeded) {
 			status = http.StatusGatewayTimeout
