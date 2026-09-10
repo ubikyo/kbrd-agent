@@ -17,6 +17,29 @@ L'agent écoute par défaut sur le port `8090` et se ré-enregistre toutes les d
 secondes auprès de KBRD-API. Les variables `KBRD_API_URL`, `KBRD_AGENT_HOST`,
 `KBRD_AGENT_PORT` et `KBRD_AGENT_NAME` peuvent remplacer les valeurs par défaut.
 
+## Interface de configuration
+
+L'agent sert sa propre interface web sur son port d'écoute, à ouvrir depuis le
+Mac lui-même : <http://localhost:8090>. Elle permet de modifier l'URL de
+KBRD-API, le nom de l'agent, l'adresse et le port d'écoute, de consulter le
+journal des requêtes reçues et de redémarrer le service.
+
+Cette interface et ses routes (`/`, `/v1/status`, `/v1/events`, `/v1/config`,
+`/v1/restart`) ne répondent qu'aux clients de la machine elle-même. Les routes
+métier consommées par KBRD-API restent protégées par le jeton partagé.
+
+Les réglages sont conservés dans `~/Library/Application Support/KBRD/agent.json`
+(`--config` pour un autre emplacement). **Ce fichier fait autorité** : les
+options de la ligne de commande et les variables d'environnement ne servent qu'à
+le créer au premier démarrage, ensuite un `make deploy-macos` avec un autre
+`KBRD_API_URL` ne l'écrase plus — passer par l'interface, ou supprimer le
+fichier. Le jeton d'authentification y est également conservé, il ne change donc
+plus à chaque redémarrage.
+
+Le bouton « Redémarrer » relance le processus en place (`exec`), ce qui recharge
+les réglages sans dépendre de launchd ; en cas d'échec le processus s'arrête et
+le LaunchAgent le relance grâce à `KeepAlive`.
+
 ## Compiler depuis Linux ou une VM
 
 ```sh

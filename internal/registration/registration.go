@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -19,7 +18,13 @@ type Payload struct {
 	Version  string `json:"version"`
 }
 
-func Run(ctx context.Context, apiURL string, payload Payload) {
+// Notify signale les échecs d'enregistrement à l'interface web locale.
+type Notify func(level, message string)
+
+func Run(ctx context.Context, apiURL string, payload Payload, notify Notify) {
+	if notify == nil {
+		notify = func(string, string) {}
+	}
 	endpoint := strings.TrimRight(apiURL, "/") + "/api/agent/register"
 	client := &http.Client{Timeout: 5 * time.Second}
 	register := func() {
@@ -39,12 +44,12 @@ func Run(ctx context.Context, apiURL string, payload Payload) {
 		request.Header.Set("Content-Type", "application/json")
 		response, err := client.Do(request)
 		if err != nil {
-			log.Printf("agent registration failed: %v", err)
+			notify("error", "enregistrement auprès de KBRD-API impossible: "+err.Error())
 			return
 		}
 		defer response.Body.Close()
 		if response.StatusCode < 200 || response.StatusCode >= 300 {
-			log.Printf("agent registration failed: %s", response.Status)
+			notify("error", "KBRD-API a refusé l'enregistrement: "+response.Status)
 		}
 	}
 

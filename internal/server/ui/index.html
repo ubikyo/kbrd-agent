@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KBRD Agent</title>
+<style>
+  :root {
+    --body: #101113;
+    --panel: #1a1b1e;
+    --panel-alt: #202124;
+    --border: #2c2e33;
+    --text: #e6e7ea;
+    --muted: #909296;
+    --accent: #339af0;
+    --accent-hover: #4dabf7;
+    --danger: #ff6b6b;
+    --success: #51cf66;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--body);
+    color: var(--text);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 32px 20px 64px; }
+  header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  h1 { font-size: 20px; margin: 0; font-weight: 600; }
+  h2 { font-size: 13px; margin: 0 0 16px; font-weight: 600; text-transform: uppercase;
+       letter-spacing: .06em; color: var(--muted); }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+         background: var(--success); margin-right: 6px; vertical-align: middle; }
+  .dot.off { background: var(--danger); }
+  section { background: var(--panel); border: 1px solid var(--border);
+            border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  input {
+    width: 100%; padding: 8px 10px; border-radius: 6px; color: var(--text);
+    background: var(--body); border: 1px solid var(--border);
+    font: inherit; font-size: 13px;
+  }
+  input:focus { outline: none; border-color: var(--accent); }
+  input[readonly] { color: var(--muted); }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .actions { display: flex; gap: 8px; margin-top: 20px; flex-wrap: wrap; align-items: center; }
+  button {
+    padding: 8px 14px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--panel-alt); color: var(--text); font: inherit; font-size: 13px;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { background: #2a2b2f; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover:not(:disabled) { background: var(--accent-hover); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 12px; }
+  .notice { padding: 10px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 16px;
+            display: none; border: 1px solid transparent; }
+  .notice.show { display: block; }
+  .notice.ok { background: rgba(81, 207, 102, .12); border-color: rgba(81, 207, 102, .35); }
+  .notice.err { background: rgba(255, 107, 107, .12); border-color: rgba(255, 107, 107, .35); }
+  .log { max-height: 380px; overflow: auto; border: 1px solid var(--border);
+         border-radius: 6px; background: var(--body); }
+  table { width: 100%; border-collapse: collapse;
+          font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  th { position: sticky; top: 0; background: var(--panel-alt); color: var(--muted);
+       text-align: left; font-weight: 500; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+  td { padding: 5px 10px; border-bottom: 1px solid rgba(44, 46, 51, .6);
+       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  td.msg { white-space: normal; word-break: break-word; color: var(--muted); }
+  tr.error td { color: var(--danger); }
+  tr.error td.msg { color: var(--danger); }
+  .status-2 { color: var(--success); }
+  .status-4, .status-5 { color: var(--danger); }
+  .empty { padding: 20px; text-align: center; color: var(--muted); font-size: 13px; }
+  .toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 12px;
+             font-size: 12px; color: var(--muted); }
+  .toolbar label { margin: 0; display: flex; gap: 6px; align-items: center; cursor: pointer; }
+  .spacer { flex: 1; }
+  @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>KBRD Agent</h1>
+    <span class="sub" id="headline" style="margin:0"><span class="dot off"></span>connexion…</span>
+  </header>
+  <p class="sub" id="configpath"></p>
+
+  <section>
+    <h2>Paramètres</h2>
+    <div class="notice" id="notice"></div>
+    <form id="form">
+      <div class="grid">
+        <div>
+          <label for="apiUrl">URL de KBRD-API</label>
+          <input id="apiUrl" name="apiUrl" placeholder="http://kbrd.local:8081" required>
+        </div>
+        <div>
+          <label for="name">Nom de l'agent</label>
+          <input id="name" name="name" placeholder="Mac de …" required>
+        </div>
+        <div>
+          <label for="host">Adresse d'écoute</label>
+          <input id="host" name="host" placeholder="0.0.0.0" required>
+        </div>
+        <div>
+          <label for="port">Port d'écoute</label>
+          <input id="port" name="port" type="number" min="1" max="65535" required>
+        </div>
+        <div style="grid-column: 1 / -1">
+          <label for="token">Jeton d'authentification (lecture seule)</label>
+          <div class="row">
+            <input id="token" readonly type="password" value="">
+            <button type="button" id="reveal">Afficher</button>
+            <button type="button" id="copy">Copier</button>
+          </div>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="submit" class="primary" id="save">Enregistrer et redémarrer</button>
+        <button type="button" id="saveOnly">Enregistrer seulement</button>
+        <button type="button" id="restart">Redémarrer l'agent</button>
+      </div>
+      <p class="hint">
+        Les réglages sont relus au démarrage : ils ne prennent effet qu'après un
+        redémarrage de l'agent. Le fichier de configuration l'emporte sur les
+        options passées par launchd.
+      </p>
+    </form>
+  </section>
+
+  <section>
+    <h2>Journal des évènements</h2>
+    <div class="toolbar">
+      <label><input type="checkbox" id="onlyErrors"> Erreurs seulement</label>
+      <span class="spacer"></span>
+      <span id="count"></span>
+      <button type="button" id="clear">Effacer l'affichage</button>
+    </div>
+    <div class="log" id="log">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:78px">Heure</th>
+            <th style="width:56px">Méth.</th>
+            <th>Chemin</th>
+            <th style="width:48px">Code</th>
+            <th style="width:60px">Durée</th>
+            <th style="width:110px">Origine</th>
+            <th style="width:34%">Détail</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="empty" id="empty">Aucun évènement pour l'instant.</div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const fields = ["apiUrl", "name", "host", "port"];
+  let events = [];
+  let lastId = 0;
+  let hidden = 0;
+  let dirty = false;
+  let currentPort = null;
+
+  fields.forEach((id) => $(id).addEventListener("input", () => { dirty = true; }));
+
+  function notify(message, kind) {
+    const notice = $("notice");
+    notice.textContent = message;
+    notice.className = "notice show " + kind;
+    if (kind === "ok") {
+      setTimeout(() => { notice.className = "notice"; }, 6000);
+    }
+  }
+
+  function online(status) {
+    const uptime = status ? formatUptime(status.uptimeSeconds) : null;
+    $("headline").innerHTML = status
+      ? '<span class="dot"></span>en ligne · v' + status.version +
+        " · démarré il y a " + uptime
+      : '<span class="dot off"></span>agent injoignable';
+    if (status) {
+      $("configpath").textContent = "Configuration : " + status.configPath;
+      $("restart").disabled = !status.canRestart;
+      $("save").disabled = !status.canRestart;
+    }
+  }
+
+  function formatUptime(seconds) {
+    if (seconds < 60) return seconds + " s";
+    if (seconds < 3600) return Math.floor(seconds / 60) + " min";
+    const hours = Math.floor(seconds / 3600);
+    return hours + " h " + Math.floor((seconds % 3600) / 60) + " min";
+  }
+
+  async function loadStatus() {
+    try {
+      const response = await fetch("/v1/status", { cache: "no-store" });
+      if (!response.ok) throw new Error(response.status);
+      const status = await response.json();
+      online(status);
+      currentPort = status.config.port;
+      if (!dirty) {
+        fields.forEach((id) => { $(id).value = status.config[id]; });
+        $("token").value = status.config.token;
+      }
+      return true;
+    } catch (error) {
+      online(null);
+      return false;
+    }
+  }
+
+  async function loadEvents() {
+    try {
+      const response = await fetch("/v1/events?since=" + lastId, { cache: "no-store" });
+      if (!response.ok) return;
+      const payload = await response.json();
+      if (!payload.events.length) return;
+      events = events.concat(payload.events).slice(-500);
+      lastId = payload.events[payload.events.length - 1].id;
+      render();
+    } catch (error) { /* l'agent redémarre peut-être */ }
+  }
+
+  function render() {
+    const onlyErrors = $("onlyErrors").checked;
+    const visible = events
+      .filter((event) => event.id > hidden)
+      .filter((event) => !onlyErrors || event.level === "error");
+    const log = $("log");
+    const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+    $("rows").innerHTML = visible.map(row).join("");
+    $("empty").style.display = visible.length ? "none" : "block";
+    $("count").textContent = visible.length + " évènement" + (visible.length > 1 ? "s" : "");
+    if (atBottom) log.scrollTop = log.scrollHeight;
+  }
+
+  function row(event) {
+    const time = new Date(event.time).toLocaleTimeString("fr-FR");
+    const status = event.status
+      ? '<span class="status-' + String(event.status)[0] + '">' + event.status + "</span>"
+      : "";
+    return "<tr class=\"" + event.level + "\">" +
+      "<td>" + time + "</td>" +
+      "<td>" + escape(event.method || "") + "</td>" +
+      "<td>" + escape(event.path || "") + "</td>" +
+      "<td>" + status + "</td>" +
+      "<td>" + (event.method ? (event.durationMs || 0) + " ms" : "") + "</td>" +
+      "<td>" + escape(event.remote || event.source || "") + "</td>" +
+      "<td class=\"msg\">" + escape(event.message || "") + "</td>" +
+      "</tr>";
+  }
+
+  function escape(value) {
+    return String(value).replace(/[&<>"]/g, (character) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;",
+    })[character]);
+  }
+
+  async function save() {
+    const payload = {
+      apiUrl: $("apiUrl").value.trim(),
+      name: $("name").value.trim(),
+      host: $("host").value.trim(),
+      port: Number($("port").value),
+    };
+    const response = await fetch("/v1/config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || "enregistrement impossible");
+    dirty = false;
+    return body.config;
+  }
+
+  async function restart(nextPort) {
+    const response = await fetch("/v1/restart", { method: "POST" });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.error || "redémarrage impossible");
+    }
+    if (nextPort && nextPort !== currentPort) {
+      const target = location.protocol + "//" + location.hostname + ":" + nextPort + "/";
+      notify("Agent redémarré sur le port " + nextPort + ". Nouvelle adresse : " + target, "ok");
+      setTimeout(() => { location.href = target; }, 2500);
+      return;
+    }
+    notify("Redémarrage en cours…", "ok");
+    for (let attempt = 0; attempt < 20; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      if (await loadStatus()) {
+        events = [];
+        lastId = 0;
+        hidden = 0;
+        await loadEvents();
+        notify("Agent redémarré.", "ok");
+        return;
+      }
+    }
+    notify("L'agent n'a pas répondu après le redémarrage — vérifier le journal " +
+           "~/Library/Logs/KBRD/agent.log", "err");
+  }
+
+  function busy(state) {
+    ["save", "saveOnly", "restart"].forEach((id) => { $(id).disabled = state; });
+  }
+
+  $("form").addEventListener("submit", async (submitEvent) => {
+    submitEvent.preventDefault();
+    busy(true);
+    try {
+      const saved = await save();
+      await restart(saved.port);
+    } catch (error) {
+      notify(error.message, "err");
+    } finally {
+      busy(false);
+    }
+  });
+
+  $("saveOnly").addEventListener("click", async () => {
+    busy(true);
+    try {
+      await save();
+      notify("Réglages enregistrés. Ils s'appliqueront au prochain redémarrage.", "ok");
+    } catch (error) {
+      notify(error.message, "err");
+    } finally {
+      busy(false);
+    }
+  });
+
+  $("restart").addEventListener("click", async () => {
+    busy(true);
+    try {
+      await restart(null);
+    } catch (error) {
+      notify(error.message, "err");
+    } finally {
+      busy(false);
+    }
+  });
+
+  $("reveal").addEventListener("click", () => {
+    const input = $("token");
+    const shown = input.type === "text";
+    input.type = shown ? "password" : "text";
+    $("reveal").textContent = shown ? "Afficher" : "Masquer";
+  });
+
+  $("copy").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText($("token").value);
+      notify("Jeton copié dans le presse-papiers.", "ok");
+    } catch (error) {
+      notify("Copie impossible : sélectionner le jeton manuellement.", "err");
+    }
+  });
+
+  $("clear").addEventListener("click", () => {
+    hidden = lastId;
+    render();
+  });
+
+  $("onlyErrors").addEventListener("change", render);
+
+  loadStatus().then(loadEvents);
+  setInterval(loadStatus, 5000);
+  setInterval(loadEvents, 2000);
+})();
+</script>
+</body>
+</html>

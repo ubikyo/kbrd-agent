@@ -9,6 +9,7 @@ import (
 
 	"github.com/ubikyo/kbrd-agent/internal/application"
 	"github.com/ubikyo/kbrd-agent/internal/browser"
+	"github.com/ubikyo/kbrd-agent/internal/events"
 )
 
 type fakeApplications struct {
@@ -47,10 +48,26 @@ func (service *fakeBrowsers) Open(_ context.Context, id string, url string) erro
 	return nil
 }
 
+func newTestServer(
+	applications application.Service,
+	browsers browser.Service,
+	store ConfigStore,
+) http.Handler {
+	return New(Options{
+		Applications: applications,
+		Browsers:     browsers,
+		Token:        "secret",
+		Events:       events.NewRecorder(50),
+		Config:       store,
+		Version:      "test",
+		Restart:      func() {},
+	})
+}
+
 func TestApplicationsRequireAuthentication(t *testing.T) {
 	request := httptest.NewRequest(http.MethodGet, "/v1/applications", nil)
 	response := httptest.NewRecorder()
-	New(&fakeApplications{}, &fakeBrowsers{}, "secret").ServeHTTP(response, request)
+	newTestServer(&fakeApplications{}, &fakeBrowsers{}, nil).ServeHTTP(response, request)
 	if response.Code != http.StatusUnauthorized {
 		t.Fatalf("expected %d, got %d", http.StatusUnauthorized, response.Code)
 	}
@@ -58,7 +75,7 @@ func TestApplicationsRequireAuthentication(t *testing.T) {
 
 func TestListsAndLaunchesApplications(t *testing.T) {
 	applications := &fakeApplications{}
-	handler := New(applications, &fakeBrowsers{}, "secret")
+	handler := newTestServer(applications, &fakeBrowsers{}, nil)
 	list := httptest.NewRequest(http.MethodGet, "/v1/applications", nil)
 	list.Header.Set("Authorization", "Bearer secret")
 	listResponse := httptest.NewRecorder()
@@ -85,7 +102,7 @@ func TestListsAndLaunchesApplications(t *testing.T) {
 
 func TestListsAndOpensBrowsers(t *testing.T) {
 	browsers := &fakeBrowsers{}
-	handler := New(&fakeApplications{}, browsers, "secret")
+	handler := newTestServer(&fakeApplications{}, browsers, nil)
 
 	list := httptest.NewRequest(http.MethodGet, "/v1/browsers", nil)
 	list.Header.Set("Authorization", "Bearer secret")
@@ -112,7 +129,7 @@ func TestListsAndOpensBrowsers(t *testing.T) {
 }
 
 func TestOpenBrowserRejectsMissingURL(t *testing.T) {
-	handler := New(&fakeApplications{}, &fakeBrowsers{}, "secret")
+	handler := newTestServer(&fakeApplications{}, &fakeBrowsers{}, nil)
 
 	open := httptest.NewRequest(
 		http.MethodPost,

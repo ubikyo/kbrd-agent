@@ -11,13 +11,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 	"sync"
 )
-
-var validBundleID = regexp.MustCompile(`^[A-Za-z0-9.-]+$`)
 
 type macOSService struct {
 	mu       sync.RWMutex
@@ -113,8 +110,18 @@ func discoverBrowsers(ctx context.Context) ([]Browser, error) {
 		})
 	}
 
+	// Whichever of them the Mac itself opens a link with, so the editors
+	// can offer it rather than asking for an answer the system already
+	// has. Safari when LaunchServices records no choice of its own — see
+	// `defaultBrowserID`.
+	preferred := readDefaultBrowserID(ctx)
+	if preferred == "" {
+		preferred = SafariBundleID
+	}
+
 	browsers := make([]Browser, 0, len(byID))
 	for _, browser := range byID {
+		browser.Default = strings.EqualFold(browser.ID, preferred)
 		browsers = append(browsers, browser)
 	}
 	sort.Slice(browsers, func(left, right int) bool {
@@ -123,9 +130,39 @@ func discoverBrowsers(ctx context.Context) ([]Browser, error) {
 	return browsers, nil
 }
 
-// readBrowser accepts an .app bundle only if it declares handling the
-// `http`/`https` URL schemes in its Info.plist — the same mechanism macOS
-// itself uses to know which apps are eligible to be the default browser.
+// readDefaultBrowserID converts LaunchServices' own preferences with the
+// same `plutil` the bundles are read through, and hands them to
+// `defaultBrowserID`. Every failure here is the same answer as "no
+// choice recorded": the file is absent on a Mac still using Safari,
+// which is not a state worth failing the whole list over.
+func readDefaultBrowserID(ctx context.Context) string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return ""
+	}
+	output, err := exec.CommandContext(
+		ctx,
+		"/usr/bin/plutil",
+		"-convert",
+		"json",
+		"-o",
+		"-",
+		filepath.Join(
+			home,
+			"Library/Preferences/com.apple.LaunchServices",
+			"com.apple.launchservices.secure.plist",
+		),
+	).Output()
+	if err != nil {
+		return ""
+	}
+	return defaultBrowserID(output)
+}
+
+// readBrowser accepts an .app bundle only if its Info.plist says it is a
+// web browser rather than merely an opener of http links — see
+// `isWebBrowser` for the difference, and for what was turning up in the
+// list while the two were treated as the same thing.
 func readBrowser(ctx context.Context, path string) (Browser, error) {
 	plistPath := filepath.Join(path, "Contents", "Info.plist")
 	output, err := exec.CommandContext(
@@ -148,7 +185,7 @@ func readBrowser(ctx context.Context, path string) (Browser, error) {
 	if !validBundleID.MatchString(bundleID) {
 		return Browser{}, errors.New("missing or invalid bundle identifier")
 	}
-	if !handlesHTTP(info["CFBundleURLTypes"]) {
+	if !isWebBrowser(info, bundleID) {
 		return Browser{}, errors.New("not a web browser")
 	}
 	name := firstString(
@@ -160,37 +197,4 @@ func readBrowser(ctx context.Context, path string) (Browser, error) {
 		return Browser{}, errors.New("missing application name")
 	}
 	return Browser{ID: bundleID, Name: name, Path: path}, nil
-}
-
-func handlesHTTP(urlTypes any) bool {
-	types, ok := urlTypes.([]any)
-	if !ok {
-		return false
-	}
-	for _, entry := range types {
-		fields, ok := entry.(map[string]any)
-		if !ok {
-			continue
-		}
-		schemes, ok := fields["CFBundleURLSchemes"].([]any)
-		if !ok {
-			continue
-		}
-		for _, scheme := range schemes {
-			text, ok := scheme.(string)
-			if ok && (strings.EqualFold(text, "http") || strings.EqualFold(text, "https")) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func firstString(values ...any) string {
-	for _, value := range values {
-		if text, ok := value.(string); ok && strings.TrimSpace(text) != "" {
-			return strings.TrimSpace(text)
-		}
-	}
-	return ""
 }
