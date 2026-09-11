@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ubikyo/kbrd-agent/internal/config"
+	"github.com/ubikyo/kbrd-agent/src/internal/config"
 )
 
 func newStore(t *testing.T) *config.Store {

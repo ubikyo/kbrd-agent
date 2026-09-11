@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ubikyo/kbrd-agent/internal/config"
-	"github.com/ubikyo/kbrd-agent/internal/events"
+	"github.com/ubikyo/kbrd-agent/src/internal/config"
+	"github.com/ubikyo/kbrd-agent/src/internal/events"
 )
 
 //go:embed ui/index.html

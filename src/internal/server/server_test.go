@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ubikyo/kbrd-agent/internal/application"
-	"github.com/ubikyo/kbrd-agent/internal/browser"
-	"github.com/ubikyo/kbrd-agent/internal/events"
+	"github.com/ubikyo/kbrd-agent/src/internal/application"
+	"github.com/ubikyo/kbrd-agent/src/internal/browser"
+	"github.com/ubikyo/kbrd-agent/src/internal/events"
 )
 
 type fakeApplications struct {

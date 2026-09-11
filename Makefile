@@ -14,13 +14,13 @@ test:
 
 build-macos: clean
 	mkdir -p "$(MACOS_DIR)"
-	GOOS=darwin GOARCH=$(MACOS_ARCH) CGO_ENABLED=0 $(GO) build -o "$(MACOS_DIR)/kbrd-agent" ./cmd/kbrd-agent
+	GOOS=darwin GOARCH=$(MACOS_ARCH) CGO_ENABLED=0 $(GO) build -o "$(MACOS_DIR)/kbrd-agent" ./src/cmd/kbrd-agent
 	cp packaging/macos/Info.plist "$(APP_DIR)/Contents/Info.plist"
 
 build-macos-universal: clean
 	mkdir -p "$(MACOS_DIR)"
-	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 $(GO) build -o dist/kbrd-agent-arm64 ./cmd/kbrd-agent
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 $(GO) build -o dist/kbrd-agent-amd64 ./cmd/kbrd-agent
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 $(GO) build -o dist/kbrd-agent-arm64 ./src/cmd/kbrd-agent
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 $(GO) build -o dist/kbrd-agent-amd64 ./src/cmd/kbrd-agent
 	lipo -create -output "$(MACOS_DIR)/kbrd-agent" dist/kbrd-agent-arm64 dist/kbrd-agent-amd64
 	cp packaging/macos/Info.plist "$(APP_DIR)/Contents/Info.plist"
 	rm dist/kbrd-agent-arm64 dist/kbrd-agent-amd64

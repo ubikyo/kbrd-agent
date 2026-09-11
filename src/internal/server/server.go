@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ubikyo/kbrd-agent/internal/application"
-	"github.com/ubikyo/kbrd-agent/internal/browser"
-	"github.com/ubikyo/kbrd-agent/internal/config"
-	"github.com/ubikyo/kbrd-agent/internal/events"
+	"github.com/ubikyo/kbrd-agent/src/internal/application"
+	"github.com/ubikyo/kbrd-agent/src/internal/browser"
+	"github.com/ubikyo/kbrd-agent/src/internal/config"
+	"github.com/ubikyo/kbrd-agent/src/internal/events"
 )
 
 // ConfigStore expose au serveur les réglages persistés, éditables depuis

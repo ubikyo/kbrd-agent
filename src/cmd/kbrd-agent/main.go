@@ -11,12 +11,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ubikyo/kbrd-agent/internal/application"
-	"github.com/ubikyo/kbrd-agent/internal/browser"
-	"github.com/ubikyo/kbrd-agent/internal/config"
-	"github.com/ubikyo/kbrd-agent/internal/events"
-	"github.com/ubikyo/kbrd-agent/internal/registration"
-	"github.com/ubikyo/kbrd-agent/internal/server"
+	"github.com/ubikyo/kbrd-agent/src/internal/application"
+	"github.com/ubikyo/kbrd-agent/src/internal/browser"
+	"github.com/ubikyo/kbrd-agent/src/internal/config"
+	"github.com/ubikyo/kbrd-agent/src/internal/events"
+	"github.com/ubikyo/kbrd-agent/src/internal/registration"
+	"github.com/ubikyo/kbrd-agent/src/internal/server"
 )
 
 const version = "1.0.0"
